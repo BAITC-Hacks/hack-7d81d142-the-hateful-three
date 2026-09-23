@@ -1,0 +1,4 @@
+-r requirements.txt
+# TestClient uses httpx2 on current Starlette and httpx on older supported releases.
+httpx>=0.28,<1.0
+httpx2>=2.0,<3.0
