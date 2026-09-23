@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>MoneyGraph AI — Граф денег</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="brand">MONEY<span>GRAPH</span> AI</div>
+  <nav aria-label="Разделы" hidden>
+    <button data-v="overview" class="active">Обзор</button>
+    <button data-v="network">Сеть</button>
+    <button data-v="priorities">Приоритеты</button>
+    <button data-v="clusters">Кластеры</button>
+  </nav>
+  <div class="search-wrap" hidden>
+    <input class="search" id="gidsearch" aria-label="Поиск по GID, роли, кластеру" placeholder="Поиск по GID, роли, кластеру…" autocomplete="off" maxlength="100">
+    <div class="search-dd" id="searchdd" aria-live="polite"></div>
+  </div>
+  <div class="account" hidden><span id="user-email" class="small"></span><button id="logout" class="btn">Выйти</button></div>
+</header>
+<div class="status-pill"><span id="connection-status" role="status">Подключение к MoneyGraph…</span></div>
+<main>
+  <div id="app-message" class="message" role="status" hidden></div>
+  <section id="auth" class="panel auth-panel" hidden>
+    <h1 id="auth-title">Вход в MoneyGraph</h1>
+    <p class="sub">Граф переводов, объяснимые роли и очередь проверки в одном рабочем пространстве.</p>
+    <form id="auth-form">
+      <label for="email">Email</label><input type="email" id="email" required autocomplete="username" placeholder="analyst@example.com">
+      <label for="password">Пароль</label><input type="password" id="password" required minlength="8" autocomplete="current-password" placeholder="Минимум 8 символов">
+      <p id="auth-error" class="message error" role="alert"></p>
+      <div class="toolbar"><button class="btn primary" id="auth-submit" type="submit">Войти</button><button class="btn" id="auth-toggle" type="button">Создать аккаунт</button></div>
+    </form>
+    <p class="feature-note">Данные проекта общие для аналитиков. Результаты анализа — гипотезы, требующие проверки человеком.</p>
+  </section>
+  <div id="workspace" hidden>
+    <div class="toolbar">
+      <button id="upload" class="btn primary">Загрузить ZIP с данными</button>
+      <input type="file" id="dataset-file" accept=".zip,application/zip" hidden>
+      <button id="analyze" class="btn" disabled>Пересчитать анализ</button>
+      <button id="refresh" class="btn">Обновить</button>
+      <span class="spacer"></span>
+      <label for="export-file">Выгрузка</label>
+      <select id="export-file"><option>nodes_roles.csv</option><option>clusters.csv</option><option>top_nodes.csv</option></select>
+      <button id="download" class="btn" disabled>Скачать CSV</button>
+    </div>
+    <section id="overview" class="view active">
+      <h1>Обзор сети</h1>
+      <p class="sub" id="overview-sub">Загрузка сводки…</p>
+      <div id="empty-dataset" class="message" hidden>Загрузите исходный ZIP: nodes.parquet, edges.parquet и transactions.parquet в папке data/ или в корне архива. Роли, кластеры и очередь проверки рассчитаются автоматически.</div>
+      <div class="grid-kpi">
+        <div class="kpi"><div class="n" id="kpi-nodes">—</div><div class="l">Узлов</div></div>
+        <div class="kpi"><div class="n" id="kpi-edges">—</div><div class="l">Рёбер</div></div>
+        <div class="kpi"><div class="n" id="kpi-seeds">—</div><div class="l">Seed-клиентов</div></div>
+        <div class="kpi warn"><div class="n" id="kpi-clusters">—</div><div class="l">Кластеров</div></div>
+      </div>
+      <div class="row">
+        <div class="panel"><h2>Топ приоритет проверки</h2><div class="plist" id="ov-top"></div></div>
+        <div class="panel"><h2>Распределение ролей</h2><div class="roledist" id="ov-roles"></div><div id="depth-warning" class="badge-warn"></div></div>
+      </div>
+      <p class="feature-note" id="analysis-meta"></p>
+    </section>
+    <section id="network" class="view">
+      <h1>Карта сети</h1>
+      <p class="sub">Реальные переводы из базы. Цвет — предполагаемая роль, размер — приоритет проверки. Выберите узел для просмотра окружения.</p>
+      <div class="toolbar"><button class="btn" id="graph-reset">Общая карта</button><label for="graph-hops">Глубина окружения</label><select id="graph-hops"><option value="1">1 шаг</option><option value="2">2 шага</option><option value="3">3 шага</option><option value="4">4 шага</option></select><button class="btn" id="all-roles">Все роли</button><button class="btn" id="cluster-queue" hidden>Очередь этого кластера</button></div>
+      <div id="netwrap">
+        <div class="filters" id="role-filters"></div>
+        <p id="graph-status" role="status"></p>
+        <div class="net-layout"><svg id="netsvg" viewBox="0 0 780 560" aria-label="Граф переводов"></svg><div class="node-panel" id="nodepanel"><div class="nl">Узел</div><div class="gidbig">—</div><div class="nv">Выберите узел на схеме</div></div></div>
+        <div class="legend"><span>Стрелки — направление перевода</span><span>Столбцы — колена 0–4</span><span>Карта показывает до 250 узлов; поиск доступен по всей очереди</span></div>
+      </div>
+    </section>
+    <section id="priorities" class="view">
+      <h1>Очередь проверки</h1><p class="sub">Ранжированный список с числовым обоснованием. Нажмите на GID, чтобы открыть узел.</p>
+      <div class="toolbar"><input id="queue-search" aria-label="GID в очереди" placeholder="Фильтр по GID" maxlength="100"><select id="queue-role" aria-label="Роль"><option value="">Все роли</option></select><select id="queue-cluster" aria-label="Кластер"><option value="">Все кластеры</option></select><button class="btn" id="queue-reset">Сбросить фильтры</button></div>
+      <div class="panel"><div class="table-scroll"><table><thead><tr><th data-k="rank" tabindex="0"># ↕</th><th data-k="gid" tabindex="0">GID ↕</th><th data-k="role" tabindex="0">Роль ↕</th><th data-k="priority" tabindex="0">Priority ↕</th><th data-k="cluster" tabindex="0">Кластер ↕</th><th>Обоснование</th></tr></thead><tbody id="pq-body"></tbody></table></div>
+      <div class="pagination"><button class="btn" id="queue-prev">Назад</button><span id="queue-page" class="small" role="status"></span><button class="btn" id="queue-next">Далее</button></div></div>
+    </section>
+    <section id="clusters" class="view"><h1>Кластеры</h1><p class="sub">Группы связанных узлов, рассчитанные по графу переводов. Откройте карточку, чтобы посмотреть связи.</p><div class="clusters-grid" id="cl-grid"></div></section>
+    <p class="notice">Роли и приоритеты рассчитаны графовыми эвристиками; это не вероятности нарушений. Кластеры и обоснования требуют проверки аналитиком. Граница выгрузки на глубине 4 ограничивает выводы о получателях.</p>
+  </div>
+</main>
+</body>
+</html>

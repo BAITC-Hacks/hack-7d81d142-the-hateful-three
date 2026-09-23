@@ -1,0 +1,6 @@
+# Backend, database migrations, and graph analysis.
+-r backend/requirements.txt
+
+# Standalone dataset profiling (analysis/profile_data.py).
+pandas>=2.2,<3.0
+numpy>=1.26,<3.0

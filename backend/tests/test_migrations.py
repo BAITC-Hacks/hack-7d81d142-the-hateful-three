@@ -23,6 +23,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from backend.core.config import settings
 from backend.core.database import create_db_engine, get_database_url
 from backend.models import Base, Cluster, Edge, Node, NodeAssessment, NodeRole, RankedNode, Transaction, User
+from backend.repositories import RankedNodeRepository
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -137,6 +138,27 @@ class MigrationTests(unittest.TestCase):
             cluster.top_gids.append("100000000000000001")
             session.commit()
             self.assertEqual(len(cluster.top_gids), 3)
+
+    def test_rank_swaps_use_migrated_constraints_and_preserve_ids(self):
+        with Session(self.connection) as session:
+            self.seed_graph(session)
+            source = NodeAssessment(**self.assessment_values())
+            destination = NodeAssessment(**(self.assessment_values() | {
+                "gid": DESTINATION, "priority_score": 0.2,
+            }))
+            session.add_all([source, destination])
+            session.flush()
+            repository = RankedNodeRepository(session)
+            repository.lock_ranking()
+            first = repository.synchronize(include_missing=True)
+            ids = {row.gid: row.id for row in first}
+            self.assertEqual([row.gid for row in first], [SOURCE, DESTINATION])
+            destination.priority_score = 0.9
+            session.flush()
+            swapped = repository.synchronize()
+            self.assertEqual([(row.gid, row.rank) for row in swapped], [(DESTINATION, 1), (SOURCE, 2)])
+            self.assertEqual({row.gid: row.id for row in swapped}, ids)
+            session.commit()
 
     def test_user_email_is_unique_and_deleted_ids_are_not_reused(self):
         with Session(self.connection) as session:

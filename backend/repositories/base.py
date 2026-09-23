@@ -27,12 +27,15 @@ class BaseRepository(Generic[ModelT]):
         return self.session.get(self.model, entity_id)
 
     def get_all(self, skip: int = 0, limit: int = 100) -> list[ModelT]:
-        """Return a stable page ordered by primary key; limit=0 returns []."""
+        """Return a stable page (primary key by default); limit=0 returns []."""
         for name, value in (("skip", skip), ("limit", limit)):
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValueError(f"{name} must be a nonnegative integer")
-        statement = select(self.model).order_by(self.model.id).offset(skip).limit(limit)
+        statement = select(self.model).order_by(*self._list_order()).offset(skip).limit(limit)
         return list(self.session.scalars(statement))
+
+    def _list_order(self):
+        return (self.model.id,)
 
     def get_by_fields(self, **fields: Any) -> ModelT | None:
         """Look up a business key, including composite keys such as src/dst."""

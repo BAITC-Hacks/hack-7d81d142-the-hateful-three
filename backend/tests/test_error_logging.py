@@ -1,15 +1,18 @@
 """Exercise the production error handlers and middleware without a database."""
 
 import asyncio
+from io import StringIO
 import logging
 import math
 from time import perf_counter
 import unittest
+from unittest.mock import patch
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from backend.core.config import settings
+from backend.core.logging import configure_logging
 from backend.core.security import SecurityConfigurationError
 from backend.main import app
 from backend.services.exceptions import ConflictError, NotFoundError, ServiceError, ValidationError
@@ -178,6 +181,36 @@ class ErrorLoggingTests(unittest.TestCase):
         self.assert_access_record(logs.records, "OPTIONS", "/success", expected_status)
         if expected_status == 200:
             self.assertEqual(response.headers["Access-Control-Allow-Origin"], origin)
+
+
+class LoggingConfigurationTests(unittest.TestCase):
+    def test_readable_console_configuration_is_idempotent(self):
+        logger = logging.Logger("isolated-backend")
+        output = StringIO()
+        with patch("backend.core.logging.logging.getLogger", return_value=logger), patch(
+            "sys.stderr", output,
+        ):
+            configure_logging()
+            handlers = tuple(logger.handlers)
+            configure_logging()
+            self.assertEqual(tuple(logger.handlers), handlers)
+            self.assertEqual(len(handlers), 1)
+            logger.info(
+                "HTTP request completed",
+                extra={
+                    "method": "POST", "path": "/example", "status_code": 201,
+                    "duration_ms": 12.345,
+                },
+            )
+            # Application messages without HTTP fields must also be printable.
+            logger.warning("Application warning")
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertFalse(lines[0].startswith("{"))
+        for field in ("INFO", "POST", "/example", "201", "12.345"):
+            self.assertIn(field, lines[0])
+        self.assertIn("WARNING", lines[1])
+        self.assertIn("Application warning", lines[1])
 
 
 if __name__ == "__main__":

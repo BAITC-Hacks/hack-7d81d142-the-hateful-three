@@ -24,7 +24,7 @@ def create_transaction(
 def list_transactions(
     service: Annotated[TransactionService, Depends(get_transaction_service)],
     skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=0)] = 100,
+    limit: Annotated[int, Query(ge=0, le=100)] = 100,
 ):
     return service.get_all(skip=skip, limit=limit)
 

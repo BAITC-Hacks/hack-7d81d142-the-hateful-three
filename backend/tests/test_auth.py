@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.core.config import Settings, settings
 from backend.core.database import create_db_engine
+from backend.core.rate_limit import limiter
 from backend.core.security import (
     SecurityConfigurationError,
     create_access_token,
@@ -108,6 +109,8 @@ class SecurityTests(unittest.TestCase):
 
 class AuthApiTests(unittest.TestCase):
     def setUp(self):
+        limiter.reset()
+        self.addCleanup(limiter.reset)
         secret_patch = patch.object(settings, "jwt_secret_key", SecretStr(TEST_SECRET))
         secret_patch.start()
         self.addCleanup(secret_patch.stop)

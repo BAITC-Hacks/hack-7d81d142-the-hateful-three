@@ -2,9 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from backend.api.dependencies import CurrentUser, credentials_exception, get_auth_service
+from backend.core.config import settings
+from backend.core.rate_limit import limiter
 from backend.core.security import create_access_token
 from backend.schemas.auth import LoginRequest, RegisterRequest, RegistrationResponse, TokenResponse
 from backend.schemas.user import UserResponse
@@ -16,7 +18,10 @@ AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 
 
 @router.post("/register", response_model=RegistrationResponse, status_code=status.HTTP_201_CREATED)
-def register(data: RegisterRequest, service: AuthServiceDependency) -> RegistrationResponse:
+@limiter.limit(lambda: settings.register_rate_limit)
+def register(
+    request: Request, response: Response, data: RegisterRequest, service: AuthServiceDependency,
+) -> RegistrationResponse:
     user = service.register(data)
     return RegistrationResponse(
         **UserResponse.model_validate(user).model_dump(),
@@ -25,7 +30,10 @@ def register(data: RegisterRequest, service: AuthServiceDependency) -> Registrat
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, service: AuthServiceDependency) -> TokenResponse:
+@limiter.limit(lambda: settings.login_rate_limit)
+def login(
+    request: Request, response: Response, data: LoginRequest, service: AuthServiceDependency,
+) -> TokenResponse:
     user = service.authenticate(str(data.email), data.password.get_secret_value())
     if user is None:
         raise credentials_exception()

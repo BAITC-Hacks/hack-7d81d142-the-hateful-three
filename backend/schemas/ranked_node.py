@@ -8,7 +8,7 @@ from backend.schemas.types import Gid, Score
 
 
 class RankedNodeBase(Schema):
-    rank: int = Field(ge=1)
+    rank: int = Field(default=1, ge=1, description="Assigned by the server; input is ignored")
     gid: Gid
     role: NodeRole
     priority_score: Score
@@ -20,7 +20,7 @@ class RankedNodeCreate(RankedNodeBase):
 
 
 class RankedNodeUpdate(Schema):
-    rank: int | None = Field(default=None, ge=1)
+    rank: int | None = Field(default=None, ge=1, description="Assigned by the server; input is ignored")
     gid: Gid | None = None
     role: NodeRole | None = None
     priority_score: Score | None = None

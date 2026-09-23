@@ -1,0 +1,6 @@
+{
+  "name": "moneygraph-dashboard-tests",
+  "private": true,
+  "scripts": {"test:e2e": "node tests/e2e/dashboard.cjs"},
+  "devDependencies": {"playwright": "1.62.1"}
+}

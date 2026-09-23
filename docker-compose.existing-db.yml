@@ -1,0 +1,20 @@
+# Standalone configuration: docker compose -f docker-compose.existing-db.yml up --build
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?Set DOCKER_DATABASE_URL in .env for your existing PostgreSQL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        python -m alembic upgrade head &&
+        exec python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --no-access-log

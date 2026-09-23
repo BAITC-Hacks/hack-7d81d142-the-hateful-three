@@ -47,3 +47,6 @@ coverage.xml
 /analysis/profile.json
 /analysis/node_features.csv
 
+# Browser test dependencies
+node_modules/
+

@@ -1,17 +1,22 @@
 """Запуск: python -m uvicorn backend.main:app --reload --no-access-log."""
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from backend.api import router
 from backend.core.config import settings
 from backend.core.logging import RequestLoggingMiddleware, configure_logging
+from backend.core.rate_limit import limiter
 from backend.core.security import SecurityConfigurationError
 from backend.services.exceptions import ConflictError, NotFoundError, ValidationError
 
@@ -20,16 +25,26 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
+    expose_headers=["Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
 # Added last so even CORS preflight responses pass through request logging.
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(router)
+FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
+app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def dashboard():
+    return FileResponse(FRONTEND / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.exception_handler(SecurityConfigurationError)

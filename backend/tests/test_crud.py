@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.core.database import create_db_engine
-from backend.models import Base, Cluster, Edge, Node, NodeRole
+from backend.models import Base, Cluster, Edge, Node, NodeAssessment, NodeRole
 from backend.repositories import (
     ClusterRepository, EdgeRepository, NodeAssessmentRepository,
     NodeRepository, RankedNodeRepository, TransactionRepository,
@@ -41,6 +41,7 @@ class CrudTests(unittest.TestCase):
         ])
         self.session.flush()
         self.session.add(Edge(src="a", dst="b", sum_kzt=10000, n_tx=2, depth=1))
+        self.session.add(NodeAssessment(**(self.cases()[4][2].model_dump() | {"gid": "c"})))
         self.session.commit()
 
     def cases(self):
@@ -65,7 +66,7 @@ class CrudTests(unittest.TestCase):
                  pass_through=1.5, truncated_by_depth=False,
              ), NodeAssessmentUpdate(priority_score=0.9)),
             (RankedNodeRepository, RankedNodeService,
-             RankedNodeCreate(gid="a", rank=1, role=NodeRole.TRANSIT, priority_score=0.8, why="2 transfers"),
+             RankedNodeCreate(gid="c", rank=1, role=NodeRole.TRANSIT, priority_score=0.8, why="2 transfers"),
              RankedNodeUpdate(why="updated explanation")),
         ]
 
@@ -158,12 +159,14 @@ class CrudTests(unittest.TestCase):
                 with self.assertRaises(ConflictError):
                     service.update(other.id, type(update)(**conflicting))
                 for key, value in changed_key.items():
+                    if isinstance(service, RankedNodeService) and key == "rank":
+                        continue  # Server assigns rank from score and gid.
                     self.assertEqual(getattr(other, key), value)
                 if isinstance(service, RankedNodeService):
+                    service.update(other.id, RankedNodeUpdate(rank=99))
+                    self.assertEqual([row.rank for row in service.get_all()], [1, 2])
                     with self.assertRaises(ConflictError):
-                        service.update(other.id, RankedNodeUpdate(rank=1))
-                    with self.assertRaises(ConflictError):
-                        service.update(other.id, RankedNodeUpdate(gid="a"))
+                        service.update(other.id, RankedNodeUpdate(gid="c"))
 
     def test_missing_references_on_create_and_partial_update(self):
         reference_changes = {
@@ -200,7 +203,7 @@ class CrudTests(unittest.TestCase):
                 self.assertEqual(getattr(entity, field), original)
         assessment_service = NodeAssessmentService(NodeAssessmentRepository(self.session))
         assessment = assessment_service.get_all()[0]
-        assessment_service.update(assessment.id, NodeAssessmentUpdate(evidence="changed"))
+        assessment_service.update(assessment.id, NodeAssessmentUpdate(evidence="changed: 2 transfers"))
         self.assertEqual(assessment.pass_through, 1.5)
         assessment_service.update(assessment.id, NodeAssessmentUpdate(pass_through=None))
         self.assertIsNone(assessment.pass_through)
@@ -254,7 +257,7 @@ class CrudTests(unittest.TestCase):
         # Simulate a competing transaction winning between precheck and INSERT.
         with patch.object(service.repository, "get_by_fields", return_value=None):
             with self.assertRaises(ConflictError) as caught:
-                service.create(NodeCreate(gid="a", depth=0))
+                service.create(NodeCreate(gid="a", depth=0, is_seed=True))
         self.assertIsInstance(caught.exception.__cause__, IntegrityError)
         self.session.rollback()
         self.assertEqual(len(service.get_all()), 3)

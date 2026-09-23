@@ -4,7 +4,7 @@ from pydantic import Field
 
 from backend.models.enums import NodeRole
 from backend.schemas.base import EntityResponse, Schema
-from backend.schemas.types import Gid, KztAmount, Score
+from backend.schemas.types import Evidence, Gid, KztAmount, Score
 
 
 class NodeAssessmentBase(Schema):
@@ -20,13 +20,13 @@ class NodeAssessmentBase(Schema):
     out_tx: int = Field(ge=0)
     in_kzt: KztAmount
     out_kzt: KztAmount
-    pagerank: float = Field(ge=0)
-    pass_through: float | None = Field(default=None, ge=0)
+    pagerank: float = Field(ge=0, le=1, allow_inf_nan=False)
+    pass_through: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     truncated_by_depth: bool
 
 
 class NodeAssessmentCreate(NodeAssessmentBase):
-    pass
+    evidence: Evidence
 
 
 class NodeAssessmentUpdate(Schema):
@@ -35,15 +35,15 @@ class NodeAssessmentUpdate(Schema):
     role_score: Score | None = None
     cluster_id: int | None = None
     priority_score: Score | None = None
-    evidence: str | None = Field(default=None, max_length=200)
+    evidence: Evidence | None = None
     in_deg: int | None = Field(default=None, ge=0)
     out_deg: int | None = Field(default=None, ge=0)
     in_tx: int | None = Field(default=None, ge=0)
     out_tx: int | None = Field(default=None, ge=0)
     in_kzt: KztAmount | None = None
     out_kzt: KztAmount | None = None
-    pagerank: float | None = Field(default=None, ge=0)
-    pass_through: float | None = Field(default=None, ge=0)
+    pagerank: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    pass_through: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     truncated_by_depth: bool | None = None
 
 

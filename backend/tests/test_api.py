@@ -13,7 +13,7 @@ from backend.core.config import settings
 from backend.core.database import create_db_engine
 from backend.core.security import create_access_token
 from backend.main import app
-from backend.models import Base, Cluster, Edge, Node, User
+from backend.models import Base, Cluster, Edge, Node, NodeAssessment, User
 
 
 class TrackingSession(Session):
@@ -60,6 +60,7 @@ class ApiTests(unittest.TestCase):
             session.flush()
             token = create_access_token(str(user.id))
             session.add(Edge(src="a", dst="b", sum_kzt=10000, n_tx=2, depth=1))
+            session.add(NodeAssessment(**(self.cases()[4][1] | {"gid": "c"})))
             session.commit()
 
         self.events = []
@@ -105,7 +106,7 @@ class ApiTests(unittest.TestCase):
                 "in_kzt": "0.00", "out_kzt": "10000.02", "pagerank": 0.1,
                 "pass_through": 1.5, "truncated_by_depth": False,
             }, {"priority_score": 0.9}),
-            ("/ranked-nodes/", {"gid": "a", "rank": 1, "role": "transit",
+            ("/ranked-nodes/", {"gid": "c", "rank": 1, "role": "transit",
                                 "priority_score": 0.8, "why": "2 transfers"},
              {"why": "updated explanation"}),
         ]
@@ -181,7 +182,7 @@ class ApiTests(unittest.TestCase):
                 self.assertIsInstance(invalid.json()["detail"], str)
                 self.assertEqual(self.client.get(item_path).json(), created)
                 if path == "/node-assessments/":
-                    changed = self.client.patch(item_path, json={"evidence": "changed"})
+                    changed = self.client.patch(item_path, json={"evidence": "changed: 2 transfers"})
                     self.assertEqual(changed.status_code, 200, changed.text)
                     self.assertEqual(changed.json()["pass_through"], 1.5)
                     cleared = self.client.patch(item_path, json={"pass_through": None})
